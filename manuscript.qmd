@@ -1,0 +1,76 @@
+---
+title: "Modern Data Visualizations for Evaluating Propensity Score Models"
+author: "Lucy D'Agostino McGowan and Malcolm Barrett"
+format: pdf
+bibliography: citations.bib
+---
+
+## Mirrored histograms
+
+Mirrored histograms are commonly recommended as a data visualization tool to examine the difference in distribution of the propensity scores between two exposure groups in the sample prior to matching or weighting [@simoneau2022recommendations; @staffa2018five]. They are also commonly used to demonstrate balance in matched cohorts [@benedetto2018statistical; @winger2016propensity]. Analogously, @li2013weighting proposed mirrored histograms for visualizing matching weights. We extend these proposals to recommend mirrored histograms as a way to visualize *any* incorporation of the propensity score, via matching or weighting. This visualization allows the viewer to quickly access the overlap between the two exposure groups pre and post propensity score adjustment. 
+
+A mirrored histogram consists of two parts: the top portion of the visualization contains the distribution of the propensity scores in the sample among those in the exposure group; the bottom portion of the visualization contains the distribution of the propensity scores in the sample among those in the control group. The distributions of the *analysis* samples created after incorporating the propensity score is then overlaid. In the case of matching, this overlay demonstrates the distribution of the propensity scores among those who were included in the matched cohort (@fig-matched-1); in the case of weighting this consists of the pseudo-population created after applying the propensity score weights (@fig-weighted).
+
+```{r}
+#| label: fig-matched
+#| echo: false
+#| message: false
+#| warning: false
+library(halfmoon)
+library(MatchIt)
+library(tidyverse)
+library(propensity)
+
+data(nhefs_weights)
+m <- matchit(qsmk ~ race + age + education + smokeintensity + smokeyrs + exercise + wt71 + active, data = nhefs_weights)
+d <- get_matches(m)
+
+
+m_calp <- matchit(qsmk ~ race + age + education + smokeintensity + smokeyrs + exercise + wt71 + active, data = nhefs_weights, caliper = 0.001)
+d_calp <- get_matches(m_calp)
+
+
+nhefs_weights$distance <- fitted(glm(qsmk ~ race + age + education + smokeintensity + smokeyrs + exercise + wt71 + active, data = nhefs_weights, family = binomial()))
+ggplot(nhefs_weights, aes(x = distance, group = qsmk)) +
+  geom_mirror_histogram(bins = 30) + 
+  geom_mirror_histogram(data = d, bins = 30, aes(fill = qsmk)) + 
+  labs(
+    fill = "Quit smoking",
+    x = "Propensity score",
+    subtitle = "Matched cohort no caliper"
+  ) + 
+  scale_y_continuous(label = abs)
+
+ggplot(nhefs_weights, aes(x = distance, group = qsmk)) +
+  geom_mirror_histogram(bins = 30) + 
+  geom_mirror_histogram(data = d_calp, bins = 30, aes(fill = qsmk)) + 
+  labs(
+    fill = "Quit smoking",
+    x = "Propensity score",
+    subtitle = "Matched cohort caliper"
+  ) + 
+  scale_y_continuous(label = abs)
+```
+```{r}
+#| label: fig-weighted
+#| echo: false
+#| message: false
+#| warning: false
+
+nhefs_weights <- nhefs_weights %>%
+  mutate(w_ate = wt_ate(distance, qsmk))
+ggplot(nhefs_weights, aes(x = distance, group = qsmk)) +
+  geom_mirror_histogram(bins = 30) + 
+  geom_mirror_histogram(aes(weight = w_ate, fill = qsmk), alpha = 0.25) + 
+  labs(
+    fill = "Quit smoking",
+    x = "Propensity score",
+    subtitle = "Average Treatment Effect (IPW) weights"
+  ) + 
+  scale_y_continuous(label = abs)
+
+```
+
+## References
+
+
